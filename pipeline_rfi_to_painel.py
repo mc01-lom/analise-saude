@@ -407,6 +407,23 @@ def read_dre(rfi_path: Path, anos_desejados: list[int]) -> dict[int, dict[int, l
 # 5. ESCRITA NO PAINEL
 # ═══════════════════════════════════════════════════════════════════════════
 
+def clear_supplier(ws, anos_cols: dict[int, tuple[int, int]],
+                   row_start: int = 73, row_end: int = 192) -> int:
+    """
+    Zera todas as células do fornecedor no Painel antes de gravar novos dados.
+    Limpa as linhas row_start..row_end nas colunas configuradas para cada ano.
+    Retorna o número de células zeradas.
+    """
+    zeradas = 0
+    for ano, (start, end) in anos_cols.items():
+        for row in range(row_start, row_end + 1):
+            for col in range(start, end + 1):
+                if ws.cell(row=row, column=col).value is not None:
+                    ws.cell(row=row, column=col).value = None
+                    zeradas += 1
+    return zeradas
+
+
 def write_to_painel(ws, dre_data: dict[int, dict[int, list[float]]],
                     anos_cols: dict[int, tuple[int, int]]) -> int:
     """
@@ -529,6 +546,8 @@ def main() -> None:
         print(f"  Anos: {anos_str}")
         print(f"  {'─' * 55}")
 
+        # ── Etapa A: leitura do RFI ──────────────────────────────────────
+        print(f"\n    [Etapa A] Lendo RFI...")
         try:
             dre_data = read_dre(rfi_path, list(anos_cols.keys()))
         except ValueError as e:
@@ -536,11 +555,16 @@ def main() -> None:
             print(f"    Pulando {supplier} e continuando...")
             continue
 
-        print(f"\n    Gravando no Painel...")
+        # ── Etapa B: limpeza das colunas no Painel ───────────────────────
+        print(f"\n    [Etapa B] Limpando dados anteriores no Painel...")
         for ano, (start, end) in sorted(anos_cols.items()):
             from openpyxl.utils import get_column_letter
             print(f"      {ano}: colunas {get_column_letter(start)}–{get_column_letter(end)}")
+        zeradas = clear_supplier(ws_painel, anos_cols)
+        print(f"      {zeradas} células zeradas.")
 
+        # ── Etapa C: gravação dos novos dados ────────────────────────────
+        print(f"\n    [Etapa C] Gravando novos dados no Painel...")
         gravadas = write_to_painel(ws_painel, dre_data, anos_cols)
         print(f"      {gravadas} linhas gravadas com sucesso.")
 
